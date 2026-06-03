@@ -20,3 +20,24 @@ It tells us how our obersvation (rows) move compared to other features
 
 
 
+
+Row Space
+
+It exist within R N because if we look at one row, it can only have the the count of how many columns there are 
+
+
+
+
+
+Null Space
+Ax = 0 
+
+A  = original dataset 
+
+x = weights applied to A 
+
+what weights applied to A will make it zero? 
+
+It is important because if there is a vector tht exist within the null space of A, that is telling us there is column that is redundant and needs to be remove 
+
+Important in PCA - Talk more 
