@@ -41,3 +41,6 @@ what weights applied to A will make it zero?
 It is important because if there is a vector tht exist within the null space of A, that is telling us there is column that is redundant and needs to be remove 
 
 Important in PCA - Talk more 
+
+
+
