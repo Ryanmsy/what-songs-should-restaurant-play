@@ -38,9 +38,36 @@ x = weights applied to A
 
 what weights applied to A will make it zero? 
 
-It is important because if there is a vector tht exist within the null space of A, that is telling us there is column that is redundant and needs to be remove 
-
-Important in PCA - Talk more 
+It is important because if there is a vector tht exist within the null space of A, that is telling us there is column that is redundant and needs to be remov
 
 
 
+--- add about left null space 
+
+-- add about rank 
+
+-- add about dot roduct 
+A dot product is a single value that tells us how much two vectors align or point in the same direction. 
+
+
+|A| = magnitude (length) of the vector
+
+Cosine tell us horiozontla movement - how far left or right did we move 
+
+Sine tell us vertical movement - how far forward or backward did we move 
+
+
+Cosine Similiarity
+we use consine instead of sine because when it is -180, cosine will show it is negative correalated while sine will show it is 0 so no differene 
+
+
+Fun Fact: 
+it is using in many video games like determining if someone is front or back, where the shadow should be (rendereing light equation)
+
+
+
+-- matrixp roduct 
+
+
+
+-- PCA 
