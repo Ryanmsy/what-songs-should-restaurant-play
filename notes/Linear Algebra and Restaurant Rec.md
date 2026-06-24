@@ -65,6 +65,13 @@ Fun Fact:
 it is using in many video games like determining if someone is front or back, where the shadow should be (rendereing light equation)
 
 
+StandardScaler vs MinMaxScaler:
+
+Standarard Scaler moves everything into the mean zero position and with sd of 1, the range could be unbounded , good for variance based models like pca 
+
+MinMaxScaler: bounded from 0 to 1, best more when distane matters like clustering, 
+
+
 
 -- matrixp roduct 
 
