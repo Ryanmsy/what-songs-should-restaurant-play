@@ -18,3 +18,54 @@
 0.6 & -0.8 & -0.4 & 0.9 \\ 
 -0.2 & 0.3 & 0.9 & -0.4 
 \end{bmatrix}$$Row 1 (Tempo): Heavily influenced by Noise Level ($0.8$), negatively impacted by Formality ($-0.5$).Row 2 (Acousticness): Heavily influenced by Formality ($0.9$), negatively impacted by Lighting ($-0.8$).Why this works beautifully: This matrix is just a static array of numbers. There is no model to train, no optimization loop to run, and no database required to store training data. You just multiply $W_{heuristic} \cdot y$ to get your target song vector. It is computationally virtually free.
+
+
+
+The problem: 
+Spotify and yelp dataset live in 2 different dimensional space. PCa only tells us which features are important etc (so lesser columns) 
+
+we cant do matrix mulitiplations because we need weight like x hat to get to the closer point of Ax = b
+
+
+The solution 
+
+use the pca to select the top componetns from the both dataset 
+
+Manually pair them together first so there is ground of truth of the model to learn what is right and wrong
+- custom matrix mapping oboth like upscale  penalzie high energy 
+
+cosiine similiart y 
+
+loss function to find the optimall weight to get x hat to map yelp matrix to spotify matrix 
+
+then human in the loop again? 
+
+YW = S 
+Y = yelp 
+W = weight 
+S = Spotify
+
+two tower apporach 
+
+canoal approcach 
+content based approach 
+
+latent space
+
+
+why is tranpose seen in many formula ? 
+
+because of the 4 spaces, for 2 different dimensions data,, they live in different spaces and we want to find a line that is perpendicular close approximation to Y 
+
+e = S - YW hat 
+
+for the error to be near zero or clostest, e must be orgothonal to Y 
+
+left null space = Yte = 0 
+
+
+
+Normal equation vs Gradient Descent 
+
+Normal equation uses tranpose while gradient descent 
+
