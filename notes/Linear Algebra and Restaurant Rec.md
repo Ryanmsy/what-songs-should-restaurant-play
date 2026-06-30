@@ -74,7 +74,31 @@ MinMaxScaler: bounded from 0 to 1, best more when distane matters like clusterin
 
 
 -- matrixp roduct 
+matrix multiple must match m * n 
+At Ax hat = Atb, finds the best fit 
 
+--dot product 
+the product of two vectors = one number s(scalar) 
+Dot product shows how much two vectors aling for example, restaruant feature like (ambience) dot product of spotify (energy) will give a scalar, indicatin how much they match 
 
 
 -- PCA 
+
+--Determinant 
+
+Very important in telling us directions / magnitude of the columns 
+
+computational efficiency as well, the 2 main properties I can think of is that changing it to upper triangle for a large matrix and since determinat (A) = Deter (U) and that to find Deter (U) we can use the product of the diagional to get the determinant 
+
+
+--orthognality 
+
+imagine if we have 2 columns, tall, and long so 2 * 10, we have more equations (rows) than unkwons (columns), not matter how weights (x) we give, we cant solve it (b). 
+
+So the columns are live withn the column space C(A) but x cant touch it because b lives maybe in the null space or row space, so we want to find next cloest thing which is  projection (p)
+
+like if columns drops direction above from (B) perpendicular 
+
+would write it s p = Ax hat
+
+e = b- p
