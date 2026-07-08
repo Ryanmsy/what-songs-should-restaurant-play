@@ -69,3 +69,23 @@ Normal equation vs Gradient Descent
 
 Normal equation uses tranpose while gradient descent 
 
+
+
+
+
+
+
+
+Manually update the weights for spca and ypca. 
+
+S = W * Y - transform YPCA to SPCA space 
+
+USe consine similiarty to find songs nears in the spotify space
+
+How to improve the weights? 
+
+Thumba up / thumbs down / skip songs 
+
+if a user likes a songs (+)
+if a user thumbs down (-)
+if a user skips (--)

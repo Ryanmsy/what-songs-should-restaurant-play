@@ -1,7 +1,20 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(./.venv/Scripts/python.exe -c \"import sys; print\\(sys.executable\\); print\\(sys.version\\)\")",
+      "Bash(./.venv/Scripts/python.exe -m pip list)",
+      "Bash(/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe -c ' *)",
+      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" -m pip list)",
+      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" \"C:\\\\Users\\\\ryanm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ryanm-Documents-coding-projects-restaurant-recommendation\\\\37a8dc47-167f-45e3-be6c-1ee5fc79f268\\\\scratchpad\\\\build_05b.py\")",
+      "Bash(cd \"c:\\\\Users\\\\ryanm\\\\Documents\\\\coding_projects\\\\restaurant_recommendation\" && mkdir -p deployment_draft/api deployment_draft/streamlit deployment_draft/artifact && find deployment_draft -type d)",
+      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" deployment_draft/artifact/build_artifact.py)",
+      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" --version)"
+    ],
     "additionalDirectories": [
-      "c:\\Users\\ryanm\\Documents\\coding_projects\\restaurant_recommendation"
+      "c:\\Users\\ryanm\\Documents\\coding_projects\\restaurant_recommendation",
+      "c:\\Users\\ryanm\\Documents\\coding_projects\\restaurant_recommendation\\deployment_draft"
     ]
   }
 }
