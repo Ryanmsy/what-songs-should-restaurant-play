@@ -77,6 +77,7 @@ restaurant_recommendation/
 - `notebooks/03_covariance_pca.ipynb` — Covariance matrix (linear algebra), redundancy analysis, eigendecomposition preview
 - `notebooks/04_pca_.ipynb` — Fits PCA on both datasets (`StandardScaler` → `PCA`, Spotify features get `log1p` on skewed columns first) → saves `spotify_pca.pkl`, `spotify_scaler.pkl`, `yelp_pca.pkl`, `yelp_scaler.pkl`, `song_pca.csv`, `restaurant_pca.csv`
 - `notebooks/05b_recommender.ipynb` — Current recommender baseline: hand-authored `W` weight matrix (Yelp-PC → Spotify-PC), targets grounded in real anchor-artist songs where available (falls back to a projected audio-feature intent otherwise), boss-level extreme-restaurant evaluation. Supersedes `05_trialrecommender.ipynb` (kept as history/scratch — has the mislabeling and scale bugs noted above, already fixed here)
+- `notebooks/05c_recommender_simplified.ipynb` — Non-technical rewrite of `05b`: identical math and results, but the 4 duplicated normalize→project→rank blocks collapse into one `recommend_songs()` function (built on `sklearn.NearestNeighbors`), verbose print loops become pandas tables, and markdown explains each step in plain language. Not a separate model — a readability layer over 05b. Pair with `notes/weight_matrix_methodology.md` for the underlying "why"
 
 ## End Goal (Linear Algebra → ML showcase)
 | Concept | Where it appears |

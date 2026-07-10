@@ -89,3 +89,8 @@ Thumba up / thumbs down / skip songs
 if a user likes a songs (+)
 if a user thumbs down (-)
 if a user skips (--)
+
+
+
+
+Database concurrency control 

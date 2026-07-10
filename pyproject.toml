@@ -10,4 +10,6 @@ dependencies = [
     "joblib==1.5.3",
     "matplotlib==3.10.8",
     "seaborn==0.13.2",
+    "fastapi>=0.139.0",
+    "uvicorn[standard]>=0.51.0",
 ]
