@@ -1,3 +1,7 @@
+# Secrets — never commit
+.env
+.env.example
+
 # Data — large files, never commit
 data/raw/
 data/processed/

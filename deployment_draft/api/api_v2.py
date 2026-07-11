@@ -1,10 +1,14 @@
 import os
+import time
 from contextlib import asynccontextmanager
-from typing import List
+from typing import List, Optional
+from urllib.parse import urlencode
 
 import joblib
 import numpy as np
+import requests
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sklearn.metrics import pairwise_distances
 
@@ -13,6 +17,11 @@ ARTIFACT_PATH = os.environ.get(
     "ARTIFACT_PATH",
     os.path.join(HERE, "..", "artifact", "recommender_artifact.pkl"),
 )
+
+SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET")
+SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback")
+SPOTIFY_SCOPES = "user-read-private"  # widen once there's an actual use for the token
 
 MODEL = {}
 
@@ -129,3 +138,46 @@ def recommend(req: RecommendRequest):
         dominant_spotify_label=spotify_pc_labels[dominant_pc],
         recommendations=recommendations,
     )
+
+
+@app.get("/login")
+def spotify_login():
+    """Redirect to Spotify's consent screen. Visit this route in a browser to start the flow."""
+    if not SPOTIFY_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="SPOTIFY_CLIENT_ID is not set")
+
+    params = {
+        "client_id": SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+        "scope": SPOTIFY_SCOPES,
+    }
+    return RedirectResponse(f"https://accounts.spotify.com/authorize?{urlencode(params)}")
+
+
+@app.get("/callback")
+def spotify_callback(code: Optional[str] = None, error: Optional[str] = None):
+    """Spotify redirects here with ?code=... after the user approves access."""
+    if error:
+        raise HTTPException(status_code=400, detail=f"Spotify authorization failed: {error}")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing 'code' query parameter")
+
+    resp = requests.post(
+        "https://accounts.spotify.com/api/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": SPOTIFY_REDIRECT_URI,
+        },
+        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
+        timeout=10,
+    )
+    if not resp.ok:
+        raise HTTPException(status_code=400, detail=f"Spotify token exchange failed: {resp.text}")
+
+    token_data = resp.json()
+    MODEL["spotify_access_token"] = token_data["access_token"]
+    MODEL["spotify_token_expires_at"] = time.time() + token_data["expires_in"]
+
+    return {"status": "connected", "expires_in": token_data["expires_in"]}

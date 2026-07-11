@@ -36,9 +36,32 @@ Spotify PC vector out).
    tempo, etc.) projected through the real scaler + PCA pipeline instead of a guess in
    raw PC space — so it's at least on the right scale, if not anchor-grounded.
 
+   > **Example** (toy numbers — real songs have 6 numbers each, not 2; this is
+   > simplified so the arithmetic fits on one line). Say "fine dining" has 3 anchor
+   > songs, and each song's music vibe is just two numbers, `[energy-ish, speechy-ish]`:
+   > ```
+   > Miles Davis  – "So What"      → [-0.8,  0.6]
+   > Coltrane     – "Naima"        → [-1.0,  0.4]
+   > Bill Evans   – "Waltz for D." → [-0.6,  0.5]
+   > -------------------------------------------
+   > average                       → [-0.8,  0.5]   <- this is "fine dining"'s target
+   > ```
+   > "Loud/chaotic" would go through the same process with its own anchor artists
+   > (AC/DC, Foo Fighters, ...) and land somewhere very different, e.g. `[1.1, -0.2]`
+   > — high energy, low speechiness. Every archetype ends up as one such vector.
+
 4. **Build one training pair per archetype**: input = a one-hot vector (1.0 on that
    archetype's Yelp PC, 0 everywhere else), output = that archetype's target Spotify-PC
    vector from step 3.
+
+   > **Example** (continuing the toy above, with just 2 archetypes instead of 8):
+   > ```
+   > input (which archetype?)   output (target music vibe)
+   > fine dining:    [1, 0]  →  [-0.8,  0.5]
+   > loud/chaotic:   [0, 1]  →  [ 1.1, -0.2]
+   > ```
+   > That's it — "training data" here just means two rows pairing a label with its
+   > measured target. No restaurants or listening history involved yet.
 
 5. **Solve for `W` with the normal equation.** With 8 training pairs like this,
    `W = argmin ||S - W·Y||²` has a closed-form solution — the same
@@ -49,10 +72,35 @@ Spotify PC vector out).
    — it's a convenient, correct way to assemble the columns, not a model discovering
    hidden structure from a large dataset.
 
+   > **Example**: with the two training pairs above, `W` is just the two target
+   > vectors placed side by side as columns:
+   > ```
+   >         fine-dining col   loud/chaotic col
+   > W  =  [    -0.8              1.1        ]
+   >       [     0.5             -0.2        ]
+   > ```
+   > Check it: `W @ [1, 0] = [-0.8, 0.5]` (exactly the fine-dining target) and
+   > `W @ [0, 1] = [1.1, -0.2]` (exactly the loud/chaotic target). That's the whole
+   > "fit" — with one-hot inputs there's no error to minimize, so the regression
+   > just hands back the targets as columns. The real `W` is 6×8 (6 music traits,
+   > 8 archetypes) instead of 2×2, built the same way.
+
 6. **Sanity-check `W` against extreme real restaurants** ("boss-level eval"): take the
    real restaurant that scores highest on each Yelp PC, project it through `W`, and check
    if the top-3 nearest real songs make sense for that vibe. This is a spot-check, not a
    formal validation — see Limitations.
+
+   > **Example**: say the most "fine dining" restaurant in the dataset isn't *purely*
+   > fine dining — it also scores a little on loud/chaotic, e.g. its raw two-archetype
+   > vibe score is `y = [3.6, 0.2]` (heavily fine dining, barely loud/chaotic).
+   > 1. **Normalize** `y` to length 1: divide by
+   >    `sqrt(3.6² + 0.2²) ≈ 3.61`, giving `y_normalized ≈ [0.998, 0.055]`.
+   > 2. **Project through `W`**: `W @ y_normalized ≈ [-0.74, 0.49]`
+   >    (using the toy `W` from step 5) — very close to the pure fine-dining target
+   >    `[-0.8, 0.5]`, just nudged slightly by that small loud/chaotic component.
+   > 3. **Find the closest real songs** to `[-0.74, 0.49]` in `song_pca.csv` by
+   >    distance — those become the recommendations. If they're all moody jazz-like
+   >    tracks, that's the sign `W` is behaving sensibly for this restaurant.
 
 ## Why this way, and not something else
 
