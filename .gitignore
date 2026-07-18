@@ -26,5 +26,15 @@ build/
 .DS_Store
 Thumbs.db
 
-# Sandbox 
+# Sandbox
 sandbox
+
+# WIP, not part of this branch's work
+notebooks/06_xna_scrape.ipynb
+scratch_run_06.py
+
+# notes for 
+notes/Appendix_A_Data_Dictionary.docx
+notes/Appendix_B_Data_Lineage.docx
+notes/Appendix_D_Model.docx
+notes/Draft_Executive_Summary.docx
