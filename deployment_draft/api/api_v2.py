@@ -7,10 +7,12 @@ from urllib.parse import urlencode
 import joblib
 import numpy as np
 import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sklearn.metrics import pairwise_distances
+
+load_dotenv()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARTIFACT_PATH = os.environ.get(
@@ -24,6 +26,38 @@ SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:
 SPOTIFY_SCOPES = "user-read-private"  # widen once there's an actual use for the token
 
 MODEL = {}
+
+
+# The API supports two artifact shapes so ARTIFACT_PATH can point at either the
+# original recommender_artifact.pkl or the newer recommender_artifact_v2.pkl
+# (cuisine-genre filtering + real popularity penalty) without a code change.
+# These helpers translate between the two schemas; everything else assumes
+# the unified names below.
+def _yelp_pc_cols(artifact):
+    return artifact.get("yelp_pc_cols") or artifact["archetype_pcs"]
+
+
+def _song_scaler(artifact):
+    return artifact.get("scaler_song") or artifact["song_scaler"]
+
+
+def _base_penalty(artifact, n_songs):
+    if "penalty" in artifact:
+        return artifact["penalty"]
+    if "popularity_penalty" in artifact:
+        return artifact["popularity_penalty"]
+    return np.ones(n_songs)
+
+
+def _matched_cuisine_genres(artifact, restaurant_row):
+    cuisine_filters = artifact.get("cuisine_genre_filters")
+    if not cuisine_filters:
+        return set()
+    genres = set()
+    for col, genre_list in cuisine_filters.items():
+        if restaurant_row.get(col, 0) == 1:
+            genres.update(genre_list)
+    return genres
 
 
 @asynccontextmanager
@@ -55,7 +89,9 @@ class SongRecommendation(BaseModel):
     name: str
     artists: str
     distance: float
-    is_hub: bool
+    is_hub: bool = False
+    genre: Optional[str] = None
+    popularity: Optional[int] = None
 
 
 class RecommendResponse(BaseModel):
@@ -63,6 +99,7 @@ class RecommendResponse(BaseModel):
     restaurant_name: str
     dominant_spotify_pc: str
     dominant_spotify_label: str
+    matched_cuisine_genres: List[str] = []
     recommendations: List[SongRecommendation]
 
 
@@ -78,7 +115,7 @@ def health():
     artifact = MODEL["artifact"]
     return HealthResponse(
         status="ok",
-        built_at=artifact["built_at"],
+        built_at=artifact.get("built_at", "unknown"),
         n_restaurants=len(artifact["restaurants_meta"]),
         n_songs=len(artifact["songs_meta"]),
     )
@@ -100,42 +137,61 @@ def recommend(req: RecommendRequest):
         raise HTTPException(status_code=404, detail=f"No restaurant with business_id={req.business_id!r}")
 
     restaurants_meta = artifact["restaurants_meta"]
-    yelp_pc_cols = artifact["yelp_pc_cols"]
+    songs_meta = artifact["songs_meta"]
+    yelp_pc_cols = _yelp_pc_cols(artifact)
     spotify_pc_cols = artifact["spotify_pc_cols"]
     spotify_pc_labels = artifact["spotify_pc_labels"]
+    song_scaler = _song_scaler(artifact)
+    song_vecs_scaled = artifact["song_vecs_scaled"]
+    base_penalty = _base_penalty(artifact, len(songs_meta))
 
-    y = restaurants_meta.loc[row_idx, yelp_pc_cols].to_numpy(dtype=float)
+    restaurant_row = restaurants_meta.loc[row_idx]
+    y = restaurant_row[yelp_pc_cols].to_numpy(dtype=float)
     y_norm = y / (np.linalg.norm(y) + 1e-9)
     s_hat = artifact["W"] @ y_norm
-    s_hat_scaled = artifact["scaler_song"].transform(s_hat.reshape(1, -1))
-
-    distances = pairwise_distances(s_hat_scaled, artifact["song_vecs_scaled"], metric="euclidean")[0]
-    distances = distances * artifact["penalty"]
-    top5 = np.argsort(distances)[:5]
+    s_hat_scaled = song_scaler.transform(s_hat.reshape(1, -1))
 
     dominant_idx = int(np.argmax(np.abs(s_hat_scaled[0])))
     dominant_pc = spotify_pc_cols[dominant_idx]
 
-    songs_meta = artifact["songs_meta"]
-    hub_threshold = artifact["hub_threshold"]
-    in_degree = artifact["in_degree"]
+    # Cuisine acts as a hard filter on the candidate pool (not a PCA target) -
+    # see notes/progress_log.md entries 6-7 for why genre can't be reached by
+    # averaging songs in audio-feature space.
+    matched_genres = _matched_cuisine_genres(artifact, restaurant_row)
+    if matched_genres and "track_genre" in songs_meta.columns:
+        candidate_idx = np.where(songs_meta["track_genre"].isin(matched_genres).values)[0]
+    else:
+        candidate_idx = np.arange(len(songs_meta))
+
+    distances = np.linalg.norm(song_vecs_scaled[candidate_idx] - s_hat_scaled, axis=1)
+    distances = distances * base_penalty[candidate_idx]
+    top_local = np.argsort(distances)[:5]
+    top_idx = candidate_idx[top_local]
+
+    hub_threshold = artifact.get("hub_threshold")
+    in_degree = artifact.get("in_degree")
+    has_genre = "track_genre" in songs_meta.columns
+    has_popularity = "popularity" in songs_meta.columns
 
     recommendations = [
         SongRecommendation(
-            id=str(songs_meta.loc[i, "id"]),
-            name=str(songs_meta.loc[i, "name"]),
-            artists=str(songs_meta.loc[i, "artists"]),
-            distance=float(distances[i]),
-            is_hub=bool(in_degree[i] > hub_threshold),
+            id=str(songs_meta.loc[song_idx, "id"]),
+            name=str(songs_meta.loc[song_idx, "name"]),
+            artists=str(songs_meta.loc[song_idx, "artists"]),
+            distance=float(distances[local_idx]),
+            is_hub=bool(in_degree[song_idx] > hub_threshold) if in_degree is not None else False,
+            genre=str(songs_meta.loc[song_idx, "track_genre"]) if has_genre else None,
+            popularity=int(songs_meta.loc[song_idx, "popularity"]) if has_popularity else None,
         )
-        for i in top5
+        for local_idx, song_idx in zip(top_local, top_idx)
     ]
 
     return RecommendResponse(
         business_id=req.business_id,
-        restaurant_name=str(restaurants_meta.loc[row_idx, "name"]),
+        restaurant_name=str(restaurant_row["name"]),
         dominant_spotify_pc=dominant_pc,
         dominant_spotify_label=spotify_pc_labels[dominant_pc],
+        matched_cuisine_genres=sorted(matched_genres),
         recommendations=recommendations,
     )
 

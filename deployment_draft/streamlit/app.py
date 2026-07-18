@@ -62,6 +62,13 @@ recommendation = st.session_state.recommendation
 if recommendation:
     st.subheader(f"Top 5 songs for {recommendation['restaurant_name']}")
     st.caption(f"Dominant vibe: {recommendation['dominant_spotify_label']}")
+
+    matched_genres = recommendation.get("matched_cuisine_genres")
+    if matched_genres:
+        st.caption(f"Cuisine match — filtered to: {', '.join(matched_genres)}")
+
     for i, song in enumerate(recommendation["recommendations"], 1):
         note = " _(common pick across many restaurants)_" if song["is_hub"] else ""
-        st.write(f"{i}. **{song['name']}** by {song['artists']}{note}")
+        detail_bits = [b for b in (song.get("genre"), song.get("popularity")) if b is not None]
+        detail = f"  ({', '.join(str(b) for b in detail_bits)})" if detail_bits else ""
+        st.write(f"{i}. **{song['name']}** by {song['artists']}{detail}{note}")

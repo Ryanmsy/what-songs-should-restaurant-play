@@ -10,7 +10,22 @@
       "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" \"C:\\\\Users\\\\ryanm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ryanm-Documents-coding-projects-restaurant-recommendation\\\\37a8dc47-167f-45e3-be6c-1ee5fc79f268\\\\scratchpad\\\\build_05b.py\")",
       "Bash(cd \"c:\\\\Users\\\\ryanm\\\\Documents\\\\coding_projects\\\\restaurant_recommendation\" && mkdir -p deployment_draft/api deployment_draft/streamlit deployment_draft/artifact && find deployment_draft -type d)",
       "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" deployment_draft/artifact/build_artifact.py)",
-      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" --version)"
+      "Bash(\"/c/Users/ryanm/AppData/Local/Programs/Python/Python310/python.exe\" --version)",
+      "Bash(python \"C:/Users/ryanm/AppData/Local/Temp/claude/c--Users-ryanm-Documents-coding-projects-restaurant-recommendation/f93bc997-25ed-4fcc-8275-62ac1176f034/scratchpad/build_exec_summary.py\")",
+      "Bash(python \"C:/Users/ryanm/AppData/Local/Temp/claude/c--Users-ryanm-Documents-coding-projects-restaurant-recommendation/f93bc997-25ed-4fcc-8275-62ac1176f034/scratchpad/build_appendix_d.py\")",
+      "Bash(python -m uvicorn --version)",
+      "Bash(ARTIFACT_PATH=\"data/processed/recommender_artifact_v2.pkl\" nohup uvicorn deployment_draft.api.api_v2:app --port 8123)",
+      "Bash(curl -s http://127.0.0.1:8123/health)",
+      "Bash(curl -s \"http://127.0.0.1:8123/restaurants?q=BAO&limit=2\")",
+      "Bash(kill %1)",
+      "Bash(ARTIFACT_PATH=\"data/processed/recommender_artifact_v2.pkl\" nohup .venv/Scripts/uvicorn.exe deployment_draft.api.api_v2:app --port 8123)",
+      "Bash(ARTIFACT_PATH=\"data/processed/recommender_artifact_v2.pkl\" nohup .venv/Scripts/uvicorn.exe deployment_draft.api.api_v2:app --port 8124)",
+      "Bash(curl -s http://127.0.0.1:8124/health)",
+      "Bash(curl -s \"http://127.0.0.1:8124/restaurants?q=BAO&limit=2\")",
+      "Bash(jobs -l)",
+      "Bash(pkill -f \"uvicorn.exe\")",
+      "Bash(grep -v \"reload\\\\|venv\\\\\\\\\\\\\\\\Scripts\\\\|recommender_artifact\\\\|ARTIFACT_PATH\\\\|streamlit run\\\\|api_v2\\\\|coding_projects\\\\|restaurant_recommendation\\\\|Draft_Executive\")",
+      "Bash(python \"C:/Users/ryanm/AppData/Local/Temp/claude/c--Users-ryanm-Documents-coding-projects-restaurant-recommendation/f93bc997-25ed-4fcc-8275-62ac1176f034/scratchpad/build_exec_summary_v2.py\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\ryanm\\Documents\\coding_projects\\restaurant_recommendation",
