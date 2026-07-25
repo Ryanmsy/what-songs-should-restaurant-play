@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -12,13 +13,26 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-load_dotenv()
-
 HERE = os.path.dirname(os.path.abspath(__file__))
-ARTIFACT_PATH = os.environ.get(
-    "ARTIFACT_PATH",
-    os.path.join(HERE, "..", "artifact", "recommender_artifact.pkl"),
-)
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+
+load_dotenv(os.path.join(REPO_ROOT, ".env"))
+
+# ARTIFACT_PATH from .env is written relative to the repo root (see .env),
+# so resolve it from there rather than the process's cwd - otherwise which
+# artifact loads depends on the directory uvicorn happened to be launched from.
+_artifact_path_env = os.environ.get("ARTIFACT_PATH")
+if _artifact_path_env:
+    ARTIFACT_PATH = (
+        _artifact_path_env
+        if os.path.isabs(_artifact_path_env)
+        else os.path.join(REPO_ROOT, _artifact_path_env)
+    )
+else:
+    ARTIFACT_PATH = os.path.join(HERE, "..", "artifact", "recommender_artifact.pkl")
+
+sys.path.insert(0, os.path.join(HERE, "..", "..", "scripts"))
+from feedback_store import get_current_adjustment, maybe_update_adjustment, write_feedback_event  # noqa: E402
 
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET")
@@ -49,6 +63,28 @@ def _base_penalty(artifact, n_songs):
     return np.ones(n_songs)
 
 
+POPULARITY_BOOST_MAX = 100  # matches MAX_POPULARITY in notebooks/05e_popularity_penalty_comparison.ipynb
+
+# Returned in one shot so the client can page through 5-at-a-time (see Streamlit
+# app) without extra round trips. 25 = 5 pages, matched to the "3-5 clicks" the
+# product asks for; quality decays further down the ranking so don't push this higher.
+N_RESULTS = 25
+
+
+def _popularity_boost_penalty(songs_meta, candidate_idx, strength):
+    """Extra multiplicative distance penalty for lower-popularity songs, on top of
+    the artifact's baked-in penalty. strength in [0, 1]: 0 = no-op (unchanged
+    behavior), 1 = full continuous log-weighted penalty (see notebook 05e's
+    penalty_continuous). Lets a request ask for more mainstream picks without
+    rebuilding the artifact. No-op for the v1 artifact (no popularity column).
+    """
+    if strength <= 0 or "popularity" not in songs_meta.columns:
+        return np.ones(len(candidate_idx))
+    pop = songs_meta.loc[candidate_idx, "popularity"].to_numpy(dtype=float)
+    continuous = np.log1p(POPULARITY_BOOST_MAX) / np.log1p(pop + 1)
+    return continuous ** strength
+
+
 def _matched_cuisine_genres(artifact, restaurant_row):
     cuisine_filters = artifact.get("cuisine_genre_filters")
     if not cuisine_filters:
@@ -68,6 +104,9 @@ async def lifespan(app: FastAPI):
     MODEL["business_id_to_row"] = {
         bid: i for i, bid in enumerate(artifact["restaurants_meta"]["business_id"])
     }
+    # song_id -> its scaled Spotify-PC vector, reused by the feedback trigger so
+    # it doesn't have to reload the artifact separately (see scripts/feedback_store.py)
+    MODEL["song_id_to_vec"] = dict(zip(artifact["songs_meta"]["id"], artifact["song_vecs_scaled"]))
     yield
     MODEL.clear()
 
@@ -82,6 +121,13 @@ class RestaurantSummary(BaseModel):
 
 class RecommendRequest(BaseModel):
     business_id: str
+    popularity_boost: float = 0.0  # 0.0-1.0; see _popularity_boost_penalty
+
+
+class FeedbackRequest(BaseModel):
+    business_id: str
+    song_id: str
+    direction: str  # "like" or "dislike"
 
 
 class SongRecommendation(BaseModel):
@@ -151,6 +197,17 @@ def recommend(req: RecommendRequest):
     s_hat = artifact["W"] @ y_norm
     s_hat_scaled = song_scaler.transform(s_hat.reshape(1, -1))
 
+    # Per-restaurant like/dislike adjustment, if this restaurant has crossed the
+    # feedback threshold (see scripts/feedback_store.py). Pull-per-request: one
+    # small SQLite lookup, defensively skipped if that fails rather than
+    # failing the whole recommendation.
+    try:
+        adjustment, _ = get_current_adjustment(req.business_id)
+    except Exception:
+        adjustment = None
+    if adjustment is not None:
+        s_hat_scaled = s_hat_scaled + np.asarray(adjustment)
+
     dominant_idx = int(np.argmax(np.abs(s_hat_scaled[0])))
     dominant_pc = spotify_pc_cols[dominant_idx]
 
@@ -163,9 +220,12 @@ def recommend(req: RecommendRequest):
     else:
         candidate_idx = np.arange(len(songs_meta))
 
+    boost_strength = max(0.0, min(1.0, req.popularity_boost))
+    boost_penalty = _popularity_boost_penalty(songs_meta, candidate_idx, boost_strength)
+
     distances = np.linalg.norm(song_vecs_scaled[candidate_idx] - s_hat_scaled, axis=1)
-    distances = distances * base_penalty[candidate_idx]
-    top_local = np.argsort(distances)[:5]
+    distances = distances * base_penalty[candidate_idx] * boost_penalty
+    top_local = np.argsort(distances)[:N_RESULTS]
     top_idx = candidate_idx[top_local]
 
     hub_threshold = artifact.get("hub_threshold")
@@ -194,6 +254,26 @@ def recommend(req: RecommendRequest):
         matched_cuisine_genres=sorted(matched_genres),
         recommendations=recommendations,
     )
+
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest):
+    """Appends one raw event, then checks (inline - no separate consumer process
+    for SQLite) whether this restaurant just crossed the update threshold; if so,
+    folds the new events into its adjustment right here. See feedback_store.py."""
+    if req.direction not in ("like", "dislike"):
+        raise HTTPException(status_code=400, detail="direction must be 'like' or 'dislike'")
+
+    if MODEL["business_id_to_row"].get(req.business_id) is None:
+        raise HTTPException(status_code=404, detail=f"No restaurant with business_id={req.business_id!r}")
+
+    try:
+        event_id = write_feedback_event(req.business_id, req.song_id, req.direction)
+        updated = maybe_update_adjustment(req.business_id, MODEL["song_id_to_vec"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not record feedback: {e}")
+
+    return {"status": "recorded", "event_id": event_id, "adjustment_updated": updated}
 
 
 @app.get("/login")

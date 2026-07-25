@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: restaurant-song-api
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r deployment_draft/api/requirements.txt"
+    startCommand: "uvicorn deployment_draft.api.api_v2:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.11
+      - key: ARTIFACT_PATH
+        value: data/processed/recommender_artifact_v2.pkl
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: SPOTIFY_REDIRECT_URI
+        sync: false
