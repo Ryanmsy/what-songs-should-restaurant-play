@@ -21,10 +21,10 @@ def get_health():
 try:
     health = get_health()
     st.caption(
-        f"API: `{API_BASE_URL}` · artifact: `{health['artifact_file']}` "
-        f"(built {health['built_at']}) · {health['n_songs']:,} songs · "
-        f"cuisine filters: {'yes' if health['has_cuisine_filters'] else 'no'} · "
-        f"popularity data: {'yes' if health['has_popularity'] else 'no'}"
+        f"API: `{API_BASE_URL}` · artifact: `{health.get('artifact_file', 'unknown - stale API build?')}` "
+        f"(built {health.get('built_at', 'unknown')}) · {health.get('n_songs', '?')} songs · "
+        f"cuisine filters: {'yes' if health.get('has_cuisine_filters') else 'no'} · "
+        f"popularity data: {'yes' if health.get('has_popularity') else 'no'}"
     )
 except requests.exceptions.RequestException as e:
     st.caption(f":warning: Couldn't reach API health check at {API_BASE_URL}: {e}")
