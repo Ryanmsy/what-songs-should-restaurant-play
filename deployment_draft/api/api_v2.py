@@ -154,16 +154,23 @@ class HealthResponse(BaseModel):
     built_at: str
     n_restaurants: int
     n_songs: int
+    artifact_file: str
+    has_cuisine_filters: bool
+    has_popularity: bool
 
 
 @app.get("/health", response_model=HealthResponse)
 def health():
     artifact = MODEL["artifact"]
+    songs_meta = artifact["songs_meta"]
     return HealthResponse(
         status="ok",
         built_at=artifact.get("built_at", "unknown"),
         n_restaurants=len(artifact["restaurants_meta"]),
-        n_songs=len(artifact["songs_meta"]),
+        n_songs=len(songs_meta),
+        artifact_file=os.path.basename(ARTIFACT_PATH),
+        has_cuisine_filters=bool(artifact.get("cuisine_genre_filters")),
+        has_popularity="popularity" in songs_meta.columns,
     )
 
 

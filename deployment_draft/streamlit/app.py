@@ -10,6 +10,25 @@ RESULTS_PER_PAGE = 5  # must divide evenly into the API's N_RESULTS (25)
 st.set_page_config(page_title="Restaurant Song Recommender")
 st.title("Restaurant Song Recommender")
 
+
+@st.cache_data(ttl=30)
+def get_health():
+    resp = requests.get(f"{API_BASE_URL}/health", timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()
+
+
+try:
+    health = get_health()
+    st.caption(
+        f"API: `{API_BASE_URL}` · artifact: `{health['artifact_file']}` "
+        f"(built {health['built_at']}) · {health['n_songs']:,} songs · "
+        f"cuisine filters: {'yes' if health['has_cuisine_filters'] else 'no'} · "
+        f"popularity data: {'yes' if health['has_popularity'] else 'no'}"
+    )
+except requests.exceptions.RequestException as e:
+    st.caption(f":warning: Couldn't reach API health check at {API_BASE_URL}: {e}")
+
 for key in ("search_results", "selected_business_id", "recommendation", "recommend_key"):
     if key not in st.session_state:
         st.session_state[key] = None

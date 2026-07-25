@@ -218,8 +218,136 @@ earlier test servers still lingering from prior sessions).
 
 ---
 
+## 13. Committed and pushed the dataset-migration branch
+
+**Steps:** Two commits on `spotify-dataset-migration` (the cuisine/popularity pipeline,
+then the API/Streamlit wiring), pushed to `origin`. `main` and `building_api`
+untouched — first time this branch has ever left the local machine.
+
+**Why:** Real, substantial work was sitting uncommitted; pushing is free insurance
+against losing it, and can't affect `main` since it's a feature branch.
+
+**Remember:** Branched off again for the next feature (`like-dislike-feedback`),
+same reasoning as before — separate concern, clean checkpoint to branch from.
+
+---
+
+## 14. Designed the like/dislike feedback loop (structure before code)
+
+**Steps:** Worked through the full system design before writing anything: user
+misunderstood "update the weights for that restaurant" as modifying the shared `W`
+(it doesn't have a per-restaurant slot at all) — corrected to a new, separate
+per-restaurant adjustment layer added on top of `W`'s output, not a change to `W`
+itself. Landed on 8 components: UI → ingestion API → raw event log → trigger logic →
+EMA update rule → derived current-state store → serving lookup → scheduler/trigger
+mechanism.
+
+**Why:** First system design for this user — deliberately covered concurrency control
+(pessimistic vs. optimistic locking), Kafka vs. DynamoDB Streams (one consumer today
+vs. many independent consumers = where Kafka earns its cost), and pull-per-request
+vs. cache-and-refresh serving, before any implementation.
+
+**Considerations:** Chose DynamoDB Streams over Kafka (one consumer, no need for
+Kafka's multi-consumer/replay strength) and pull-per-request over caching (simpler,
+accepted the small per-request lookup cost). EMA kept deliberately simple per user's
+request: one fixed alpha, symmetric like/dislike treatment, zero cold-start, capped
+magnitude — no tuning logic.
+
+---
+
+## 15. Built the feedback loop against real AWS DynamoDB
+
+**Steps:** User chose real DynamoDB over SQLite (timeline explicitly not a
+constraint for this feature) and will supply real credentials via `.env`. Built:
+`scripts/dynamodb_setup.py` (provisions both tables, Streams enabled on the events
+table), `scripts/feedback_store.py` (shared read/write helpers), and
+`scripts/feedback_consumer.py` (reads the real DynamoDB Stream directly via
+`boto3`'s low-level Streams API — same event-driven mechanism a deployed Lambda
+would use, just running as a local process instead of one).
+
+**Why:** Deploying an actual Lambda needs IAM role creation through the AWS
+Console — steps that need the user driving them, not something scriptable end to
+end. The local-consumer approach uses the *same real infrastructure and the same
+logic* Lambda would run; promoting it later is a packaging change, not a rewrite.
+
+**Considerations:** The consumer only discovers shards that exist at startup — a
+table under enough write volume to reshard mid-run would need periodic
+re-discovery. Not a concern at this project's scale.
+
+**Remember:** Nothing in this entry has been run against real AWS yet — all three
+scripts import cleanly, but need real credentials in `.env` before `dynamodb_setup.py`
+can actually provision anything.
+
+---
+
+## 16. Wired the feedback loop into the API and Streamlit
+
+**Steps:** Added `POST /feedback` (ingestion only — validates and writes one event,
+touches no weights) and a pull-per-request adjustment lookup in `/recommend`
+(wrapped in try/except so a DynamoDB hiccup degrades to "no adjustment" rather than
+breaking recommendations). Streamlit gained 👍/👎 buttons per song, tracked in
+session state so a restaurant's already-rated songs show "You: liked/disliked"
+instead of buttons on rerun.
+
+**Why:** Matches the design exactly — ingestion and serving are separate concerns,
+and the adjustment lookup is additive/defensive so it can never be a new failure
+mode for existing recommendation behavior.
+
+**Considerations:** Same as [15] — code is written and syntax-verified, not yet
+tested end-to-end against real DynamoDB.
+
+---
+
+## 17. Pivoted from DynamoDB to SQLite
+
+**Steps:** User reconsidered — AWS's free tier expires, and this project doesn't
+need cloud-scale storage. Rewrote `feedback_store.py` against `sqlite3` (stdlib,
+zero setup) behind the *exact same function signatures* designed for DynamoDB, so
+nothing calling it had to change conceptually. Deleted `dynamodb_setup.py` and
+`feedback_consumer.py` — SQLite has no Streams equivalent, so the trigger check
+now just runs inline, synchronously, right after each write inside `/feedback`
+itself. Removed the now-unused `boto3` dependency.
+
+**Why:** Matches something we covered early in the design conversation: [4] and [8]
+(trigger + scheduler) collapse into one thing at small scale. Losing Streams didn't
+cost a separate consumer process — it removed the need for one entirely.
+
+**Considerations:** `songs_meta`/`song_vecs_scaled` were previously reloaded
+separately inside `feedback_consumer.py`; now that the update logic runs inside the
+API process, it reuses the artifact *already loaded* in `MODEL` — one less
+duplicate copy of ~80K song vectors in memory.
+
+---
+
+## 18. Verified the full feedback loop end-to-end (real run, not just code)
+
+**Steps:** Ran the actual sequence against "Smokin' Out" (the BBQ/Southern
+restaurant): liked 2 songs, disliked 2 songs (4 events — exactly the threshold).
+First 3 `/feedback` calls returned `adjustment_updated: false`; the 4th returned
+`true`. Re-ran `/recommend` for the same restaurant afterward.
+
+**Why:** This is the first time any part of the feedback loop has actually been
+exercised, not just imported/syntax-checked — DynamoDB never got this far.
+
+**Considerations:** The shift was real and in the right direction: the liked song
+"Metas e Versos" jumped to #1 (distance 0.513 → 0.394); both disliked songs
+("Bloodshot," "Meu Lugar") dropped **out of the top 5 entirely**; the cuisine-genre
+filter stayed intact the whole time (every replacement song was still
+country/blues/gospel/bluegrass/honky-tonk). Inspected the SQLite file directly
+afterward — both tables had exactly the expected rows.
+
+**Remember:** Test database (`data/processed/feedback.db`) was deleted after
+verification so a real user's first restaurant doesn't start with fake feedback
+baked in.
+
+---
+
 ## Not done yet (as of this entry)
 
-- Decide whether `spotify-dataset-migration` is ready to merge back toward `main`/`building_api`, or needs more work first
-- The 8 cuisine buckets with no genre mapping (Italian, Mediterranean, Greek, Thai, Vietnamese, Cajun/Creole, Asian Fusion, generic American) still fall back to pure vibe-matching — unresolved gap, not a bug
-- Commit the branch's work (currently uncommitted)
+- Click-through test in the actual Streamlit UI (the 👍/👎 buttons) — verified so
+  far via curl against the API directly, not through the browser
+- Decide whether `spotify-dataset-migration`/`like-dislike-feedback` are ready to
+  merge back toward `main`/`building_api`, or need more work first
+- The 8 cuisine buckets with no genre mapping (Italian, Mediterranean, Greek, Thai,
+  Vietnamese, Cajun/Creole, Asian Fusion, generic American) still fall back to pure
+  vibe-matching — unresolved gap, not a bug
