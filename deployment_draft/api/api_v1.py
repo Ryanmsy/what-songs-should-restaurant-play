@@ -10,7 +10,7 @@ app = FastAPI()
 
 class API_inputs(BaseModel):
     restaurant_name: str 
-    date: int # example, I am not sure what to put in here 
+    date: int # example,  
 
 
 

@@ -102,3 +102,37 @@ like if columns drops direction above from (B) perpendicular
 would write it s p = Ax hat
 
 e = b- p
+
+Determindant 
+
+Basis 
+
+Diagnolozation 
+
+uk+1 = Auk
+-fibonnaci example 
+S lamdha to the power of k S -1 
+
+- pagerank google, markrov chain
+
+
+very cool how symmethric matrix will show with conjugation that it would equal = a2 + b2 
+
+
+if we were to find the eigonvalue the tradiotional way of getting the determinant and wqauring the root of the polynominal, it would be impossible for a 50 by 50 
+
+
+signs of pivot for symmetric matrixs are the same as sign of of the egienvalues 
+number pivots = postive eignonvalue 
+
+positive denfinte  symmetric matrix 
+
+
+
+permutation matrix is important for getting n to the power of 2 to n log 2
+
+what is log 
+
+quadaratic fformula, bowl, postive definite, I think gradient descent 
+
+Jordan forms 

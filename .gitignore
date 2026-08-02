@@ -34,6 +34,12 @@ Thumbs.db
 # Office temp/lock files
 ~$*.docx
 ~$*.pptx
+~WRL*.tmp
+
+# School/personal assignment files - not part of this project
+A10 Final Executive Summary(1).docx
+Ryan Moh A10 Draft.docx
+Ryan Moh A7.docx
 
 # Local feedback DB (sqlite) — ephemeral per-environment, not shared via git
 data/processed/feedback.db
@@ -44,9 +50,17 @@ sandbox
 # WIP, not part of this branch's work
 notebooks/06_xna_scrape.ipynb
 scratch_run_06.py
+out.txt
 
 # notes for 
 notes/Appendix_A_Data_Dictionary.docx
 notes/Appendix_B_Data_Lineage.docx
 notes/Appendix_D_Model.docx
 notes/Draft_Executive_Summary.docx
+
+
+#Scripts
+notes/PCA_Pipeline_Overview.pptx
+notes/assets/
+scripts/scrape_xna_restaurants.py
+scripts/view_feedback.py
