@@ -136,3 +136,5 @@ what is log
 quadaratic fformula, bowl, postive definite, I think gradient descent 
 
 Jordan forms 
+
+SVD 
