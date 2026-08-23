@@ -49,6 +49,9 @@ class Spotify(Ingestion):
 
     def specific_missing_value(self):
         """remove any songs where tempo is 0."""
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
+
         before = len(self.df)
         self.df = self.df[self.df['tempo'] != 0]
 
@@ -77,11 +80,17 @@ class Yelp(Ingestion):
 
     def specific_missing_value(self):
         """Drop duplicate restaurants by business_id."""
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
+
         self.df = self.df.drop_duplicates(subset='business_id', keep='first')
         return self.df
 
     def numerical_outlier_values(self):
         """Remove numerical outliers using the IQR method (continuous columns only)."""
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
+
         numerical_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
         numerical_cols = [c for c in numerical_cols if c not in self.BINARY_COLS]
 
@@ -102,6 +111,8 @@ class Yelp(Ingestion):
             If columns less than 2 then binary encoding
             if columns > 2 & < 5 then one hot encoding
             else stop process, ask human """
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
 
         # Noise
         if 'NoiseLevel' in self.df.columns:
@@ -124,6 +135,9 @@ class Yelp(Ingestion):
         return self.df
 
     def boolean_switch(self):
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
+
         bool_cols = self.df.select_dtypes(include='bool').columns.tolist()
         self.df[bool_cols] = self.df[bool_cols].astype(int)
 
@@ -155,5 +169,5 @@ def run_pipeline():
 
 
 if __name__ == "__main__":
-    # yelp_data, spotify_data = run_pipeline()
+    yelp_data, spotify_data = run_pipeline()
     pass
