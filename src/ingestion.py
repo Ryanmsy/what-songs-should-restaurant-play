@@ -47,6 +47,10 @@ class Ingestion:
 
 class Spotify(Ingestion):
 
+    # Kept alongside the audio features (not fed into scaling/PCA) so a PCA row
+    # can still be traced back to a real song downstream in the recommender.
+    ID_COLS = ['id', 'name', 'artists']
+
     def specific_missing_value(self):
         """remove any songs where tempo is 0."""
         if self.df is None:
@@ -60,12 +64,43 @@ class Spotify(Ingestion):
         print(f"Cleaned! Rows dropped: {before - len(self.df)}")
         return self.df
 
+    def filter_year(self):
+        self.df = self.df[self.df['year'].between(2000, 2020)]
+        return self.df
+
+    def filter_audio_features(self):
+        AUDIO_FEATURES = [
+        'danceability', 'energy', 'speechiness', 'acousticness',
+        'instrumentalness', 'liveness', 'valence', 'loudness', 'tempo'
+        ]
+
+        self.df = self.df[self.ID_COLS + AUDIO_FEATURES]
+        return self.df
+
+    def apply_log(self):
+
+        SKEWED = ['instrumentalness', 'acousticness', 'speechiness', 'liveness']
+
+        self.df[SKEWED] = self.df[SKEWED].apply(np.log1p)
+        return self.df
+
     def run(self):
         super().run()
+        self.filter_year()
         self.specific_missing_value()
+        self.filter_audio_features()
+        self.apply_log()
+
+        if self.df is None:
+            raise ValueError("DataFrame is empty. Call import_data() first!")
+        self.df = self.df.dropna()
         return self.df
 
 class Yelp(Ingestion):
+
+    # Kept alongside the features (not fed into scaling/PCA) so a PCA row can
+    # still be traced back to a real restaurant downstream in the recommender.
+    ID_COLS = ['business_id', 'name']
 
     # Shared with numerical_outlier_values() so IQR filtering never runs on these —
     # they're 0/1 flags, not continuous values, and IQR bounds collapse to a single
@@ -144,12 +179,40 @@ class Yelp(Ingestion):
         self.df[self.BINARY_COLS] = self.df[self.BINARY_COLS].astype(int)
         return self.df
 
+    def filter_continous(self):
+        YELP_CANDIDATES = [
+        'Ambience.romantic', 'Ambience.divey', 'Ambience.classy',
+        'Ambience.hipster', 'Ambience.trendy', 'Ambience.upscale', 'Ambience.casual',
+        'HasTV', 'HappyHour', 'RestaurantsGoodForGroups',
+        'GoodForMeal.breakfast', 'GoodForMeal.brunch',
+        'GoodForMeal.latenight', 'GoodForMeal.dinner',
+        'RestaurantsTableService', 'NoiseLevel', 'stars'
+    ]
+
+        YELP_FEATURES = [c for c in YELP_CANDIDATES if c in self.df.columns]
+
+        self.df = self.df[self.ID_COLS + YELP_FEATURES].dropna()
+        return self.df
+
+    def drop_constant_columns(self):
+        variance = self.df.var(numeric_only=True)
+        low_var_cols = variance[variance < 0.01].index.tolist()
+
+        if low_var_cols:
+            self.df = self.df.drop(columns=low_var_cols)
+        else:
+            print("No near-constant columns found.")
+
+        return self.df
+
     def run(self):
         super().run()
         self.specific_missing_value()
         self.numerical_outlier_values()
         self.categorical_encoding()
         self.boolean_switch()
+        self.filter_continous()
+        self.drop_constant_columns()
         print(" Yelp pipeline complete!")
         return self.df
 
