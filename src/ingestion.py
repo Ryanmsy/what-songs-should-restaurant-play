@@ -37,10 +37,16 @@ class Ingestion:
             self.df[col] = self.df[col].replace('unknown', float('nan'))
         return self.df
 
+    def validate(self):
+        if self.df is None:
+            raise ValueError('df is empty')
+        return self.df 
+
     def run(self):
         self.import_data()
         self.cleaning()
         self.clean_unknown_values()
+        self.df = self.validate()
         return self.df
 
     
@@ -80,16 +86,19 @@ class Spotify(Ingestion):
     def apply_log(self):
 
         SKEWED = ['instrumentalness', 'acousticness', 'speechiness', 'liveness']
-
+        if self.df is None: 
+            raise ValueError('error at apply_log')
         self.df[SKEWED] = self.df[SKEWED].apply(np.log1p)
         return self.df
 
     def run(self):
         super().run()
+        self.df = self.validate()
         self.filter_year()
         self.specific_missing_value()
         self.filter_audio_features()
         self.apply_log()
+
 
         if self.df is None:
             raise ValueError("DataFrame is empty. Call import_data() first!")
@@ -207,6 +216,7 @@ class Yelp(Ingestion):
 
     def run(self):
         super().run()
+        self.df = self.validate()
         self.specific_missing_value()
         self.numerical_outlier_values()
         self.categorical_encoding()
